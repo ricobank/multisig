@@ -1,0 +1,8 @@
+{
+  "name": "sneketh",
+  "version": "0.0.1",
+  "type": "module",
+  "dependencies": {
+    "tapzero": "^0.6.1"
+  }
+}
