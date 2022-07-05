@@ -1,8 +1,22 @@
 {
-  "name": "sneketh",
+  "name": "vymultisig",
   "version": "0.0.1",
-  "type": "module",
+  "scripts": {
+    "initialize": "npm i && npm run download-submodules && npm run install-submodules",
+    "download-submodules": "git submodule update --init --recursive --remote",
+    "install-submodules": "npm run init:gemfab",
+    "init:gemfab": "cd lib/gemfab && npm i && npm run build",
+    "test": "snek test && cd test && node multsig-test.js",
+    "test2": "cd test && node multisig-test.js",
+    "test3": "snek test"
+  },
   "dependencies": {
     "tapzero": "^0.6.1"
+  },
+  "devDependencies": {
+    "@etherpacks/dpack": "^0.0.29",
+    "@nomiclabs/hardhat-ethers": "^2.0.6",
+    "hardhat": "^2.9.9",
+    "minihat": "^0.0.6"
   }
 }
