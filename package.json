@@ -7,7 +7,7 @@
     "install-submodules": "npm run init:gemfab",
     "init:gemfab": "cd lib/gemfab && npm i && npm run build",
     "test": "snek test && cd test && node multsig-test.js",
-    "test2": "cd test && node multisig-test.js",
+    "test2": "node test/multisig-test.js",
     "test3": "snek test"
   },
   "dependencies": {
