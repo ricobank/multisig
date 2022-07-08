@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 const fs = require('fs')
 
 const dpack = require('@etherpacks/dpack')

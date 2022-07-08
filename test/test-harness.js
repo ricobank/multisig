@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 const dpack = require('@etherpacks/dpack')
 const hh = require('hardhat')
 const ethers = hh.ethers

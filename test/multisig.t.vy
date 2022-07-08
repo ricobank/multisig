@@ -1,3 +1,5 @@
+## SPDX-License-Identifier: MIT
+
 interface Snek:
     def make(typename: String[32], objectname: String[32], args: Bytes[3200]) -> address: nonpayable
     def echo(target: address): nonpayable

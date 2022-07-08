@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 const hh = require('hardhat')
 const ethers = hh.ethers
 const { BigNumber, utils } = require("ethers")
