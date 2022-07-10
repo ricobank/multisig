@@ -72,8 +72,41 @@ TestHarness.test('msig moves tokens', {
     assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
 })
 
-TestHarness.test('insufficient member signatures', {
+TestHarness.test('insufficient number of member signatures', {
 }, async (harness, assert) => {
+    const [ali, bob, cat] = await ethers.getSigners()
+    const {members, signers} = sorted_participants([ali, bob, cat])
+    const threshold = 3
+    const chain_id = await hh.network.config.chainId;
+    const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
+    const nonce = await multisig.nonce()
+    const rico = harness.rico
+
+    const data = rico.interface.encodeFunctionData("transfer", [ bob.address, 1 ])
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+        chain_id, multisig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, 0, data, nonce, 
+        ali.address)
+    const msg_hash = utils.arrayify(utils.keccak256(`0x1901${DOMAIN_SEPARATOR.slice(2)}${tx_input_hash.slice(2)}`))
+
+    const v_arr = []
+    const r_arr = []
+    const s_arr = []
+
+    // Slicing to remove a member and cause num sigs error
+    for (signer of signers.slice(1)) {
+        const raw_sig = await signer.signMessage(msg_hash)
+        const split_sig = utils.splitSignature(raw_sig)
+        v_arr.push(split_sig.v)
+        r_arr.push(split_sig.r)
+        s_arr.push(split_sig.s)
+    }
+    try {
+        await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, 0, data, ali.address, {gasLimit: 10000000})
+        assert.fail()
+    } catch(e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'Num sigs err'")
+    }
 
 })
 
