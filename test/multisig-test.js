@@ -127,3 +127,17 @@ TestHarness.test('fail create with threshold > members', {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'Config err'")
     }
 })
+
+TestHarness.test('fail create member addresses wrong order', {
+}, async (harness, assert) => {
+    const [ali, bob, cat] = await ethers.getSigners()
+    const threshold = 3
+    const chain_id = await hh.network.config.chainId;
+    const {_, members} = sorted_participants([ali, bob, cat])
+    try {
+        await harness.multisig_deployer.deploy(threshold, members.reverse(), chain_id)
+        assert.fail() // ensure failure if doesn't throw
+    } catch (e) { 
+        assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'Order err'")
+    }
+})
