@@ -46,23 +46,11 @@ TestHarness.test('msig moves tokens', {
     const r_arr = []
     const s_arr = []
 
-    let domain_data = EIP712DOMAINTYPE_HASH
-                   + NAME_HASH.slice(2) 
-                   + VERSION_HASH.slice(2)
-                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
-                   + multisig.address.slice(2).padStart(64, '0')
-                   + SALT.slice(2)
-    domain_data = domain_data.toLowerCase()
-    DOMAIN_SEPARATOR = utils.keccak256(domain_data)
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+        chain_id, multisig.address, SALT)
     
-    let tx_input = TXTYPE_HASH
-                + rico.address.slice(2).padStart(64, '0')
-                + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
-                + utils.keccak256(data).slice(2)
-                + utils.hexlify(nonce).slice(2).padStart(64, '0')
-                + executor.slice(2).padStart(64, '0')
-    tx_input = tx_input.toLowerCase()
-    let tx_input_hash = utils.keccak256(tx_input)
+    let tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, eth_amt, data, nonce, 
+        executor)
     
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -84,8 +72,41 @@ TestHarness.test('msig moves tokens', {
     assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
 })
 
-TestHarness.test('insufficient members', {
+TestHarness.test('insufficient number of member signatures', {
 }, async (harness, assert) => {
+    const [ali, bob, cat] = await ethers.getSigners()
+    const {members, signers} = sorted_participants([ali, bob, cat])
+    const threshold = 3
+    const chain_id = await hh.network.config.chainId;
+    const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
+    const nonce = await multisig.nonce()
+    const rico = harness.rico
+
+    const data = rico.interface.encodeFunctionData("transfer", [ bob.address, 1 ])
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+        chain_id, multisig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, 0, data, nonce, 
+        ali.address)
+    const msg_hash = utils.arrayify(utils.keccak256(`0x1901${DOMAIN_SEPARATOR.slice(2)}${tx_input_hash.slice(2)}`))
+
+    const v_arr = []
+    const r_arr = []
+    const s_arr = []
+
+    // Slicing to remove a member and cause num sigs error
+    for (signer of signers.slice(1)) {
+        const raw_sig = await signer.signMessage(msg_hash)
+        const split_sig = utils.splitSignature(raw_sig)
+        v_arr.push(split_sig.v)
+        r_arr.push(split_sig.r)
+        s_arr.push(split_sig.s)
+    }
+    try {
+        await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, 0, data, ali.address, {gasLimit: 10000000})
+        assert.fail()
+    } catch(e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'Num sigs err'")
+    }
 
 })
 
@@ -141,3 +162,26 @@ TestHarness.test('fail create member addresses wrong order', {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
     }
 })
+
+// Test Helper Functions 
+function createDomainSeparator(domain_type_hash, name_hash, version_hash, chain_id, address, salt) {
+    // TODO: !DMFXYZ! Probably useful to have this as a seperate import
+    // and not rely on this files constants
+    const domain_data = domain_type_hash
+                   + name_hash.slice(2) 
+                   + version_hash.slice(2)
+                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
+                   + address.slice(2).padStart(64, '0')
+                   + salt.slice(2)
+    return utils.keccak256(domain_data.toLowerCase())
+}
+
+function createTransactionHash(tx_type_hash, target_address, amount, data, nonce, executor) {
+     let tx_input = tx_type_hash
+                + target_address.slice(2).padStart(64, '0')
+                + utils.hexlify(amount).slice(2).padStart(64, '0')
+                + utils.keccak256(data).slice(2)
+                + utils.hexlify(nonce).slice(2).padStart(64, '0')
+                + executor.slice(2).padStart(64, '0')
+    return utils.keccak256(tx_input.toLowerCase())
+}
