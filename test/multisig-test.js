@@ -124,7 +124,7 @@ TestHarness.test('fail create with threshold > members', {
         await harness.multisig_deployer.deploy(threshold, members, chain_id)
         assert.fail() // ensure failure if doesn't throw
     } catch (e) { 
-        assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'Config err'")
+        assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/min_owners'")
     }
 })
 
@@ -138,6 +138,6 @@ TestHarness.test('fail create member addresses wrong order', {
         await harness.multisig_deployer.deploy(threshold, members.reverse(), chain_id)
         assert.fail() // ensure failure if doesn't throw
     } catch (e) { 
-        assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'Order err'")
+        assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
     }
 })
