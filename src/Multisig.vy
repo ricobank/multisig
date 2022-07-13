@@ -1,14 +1,10 @@
 ## SPDX-License-Identifier: MIT
 
 ## EIP712 Precomputed hashes:
- # keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
-EIP712DOMAINTYPE_HASH: constant(bytes32) = 0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472
- # keccak256("tiny multisig")
-NAME_HASH:             constant(bytes32) = 0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6
- # keccak256("1")
-VERSION_HASH:          constant(bytes32) = 0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6
- # keccak256("MultiSigTransaction(address destination,uint256 value,bytes data,uint256 nonce,address executor)")
-TXTYPE_HASH:           constant(bytes32) = 0x77a02b8d4d89821b65796d535cba07669f292aede4f4a6e17753e6e3d2499732
+EIP712DOMAINTYPE_HASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
+NAME_HASH:             constant(bytes32) = keccak256("tiny multisig")
+VERSION_HASH:          constant(bytes32) = keccak256("1")
+TXTYPE_HASH:           constant(bytes32) = keccak256("MultiSigTransaction(address destination,uint256 value,bytes data,uint256 nonce,address executor)")
 SALT:                  constant(bytes32) = 0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650
 MAX_OWNERS:            constant(uint256) = 16
 DOMAIN_SEPARATOR:      immutable(bytes32)
