@@ -64,7 +64,7 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
     assert len(v) == len(r) \
        and len(r) == len(s) \
        and len(s) == self.threshold, 'Num sigs err'
-    assert executor == msg.sender or executor == empty(address), 'Executor err'
+    assert executor == msg.sender or executor == empty(address), 'err/wrong_executor'
 
     txn_hash: bytes32 = keccak256(_abi_encode(TXTYPE_HASH, target, amount, keccak256(data), self.nonce, executor))
     sum_hash: bytes32 = keccak256(concat(convert('\x19\x01', Bytes[2]), DOMAIN_SEPARATOR, txn_hash))
@@ -75,8 +75,8 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
         if i >= self.threshold:
             break
         addr: address = ecrecover(msg_hash, v[i], r[i], s[i])
-        assert convert(addr, uint160) > convert(last, uint160), 'Order err'
-        assert self.is_member[addr], 'Member err'
+        assert convert(addr, uint160) > convert(last, uint160), 'err/owner_order'
+        assert self.is_member[addr], 'err/not_member'
         last = addr
 
     self.nonce += 1
