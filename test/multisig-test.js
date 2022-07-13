@@ -8,7 +8,7 @@ const { send, wad } = require('minihat')
 const TestHarness = require('./test-harness')
 
 let DOMAIN_SEPARATOR
-const TXTYPE_HASH           = '0x77a02b8d4d89821b65796d535cba07669f292aede4f4a6e17753e6e3d2499732'
+const TXTYPE_HASH           = '0xe7beff35c01d1bb188c46fbae3d80f308d2600ba612c687a3e61446e0dffda0b'
 const NAME_HASH             = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
 const VERSION_HASH          = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6'
 const EIP712DOMAINTYPE_HASH = '0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472'
@@ -60,7 +60,6 @@ TestHarness.test('msig moves tokens', {
                 + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
                 + utils.keccak256(data).slice(2)
                 + utils.hexlify(nonce).slice(2).padStart(64, '0')
-                + executor.slice(2).padStart(64, '0')
     tx_input = tx_input.toLowerCase()
     let tx_input_hash = utils.keccak256(tx_input)
     
@@ -78,7 +77,7 @@ TestHarness.test('msig moves tokens', {
         s_arr.push(split_sig.s)
     }
 
-    await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, executor,  {gasLimit: 10000000})
+    await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data,  {gasLimit: 10000000})
 
     bob_rico_2 = await rico.balanceOf(bob.address)
     assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
