@@ -40,42 +40,14 @@ TestHarness.test('msig moves tokens', {
     bob_rico_1 = await rico.balanceOf(bob.address)
     assert.equal(bob_rico_1, 0)
 
-    const v_arr = []
-    const r_arr = []
-    const s_arr = []
-
-    let domain_data = EIP712DOMAINTYPE_HASH
-                   + NAME_HASH.slice(2) 
-                   + VERSION_HASH.slice(2)
-                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
-                   + multisig.address.slice(2).padStart(64, '0')
-                   + SALT.slice(2)
-    domain_data = domain_data.toLowerCase()
-    DOMAIN_SEPARATOR = utils.keccak256(domain_data)
-    
-    let tx_input = TXTYPE_HASH
-                + rico.address.slice(2).padStart(64, '0')
-                + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
-                + utils.keccak256(data).slice(2)
-                + utils.hexlify(nonce).slice(2).padStart(64, '0')
-                + utils.hexlify(expiry).slice(2).padStart(64, '0')
-    tx_input = tx_input.toLowerCase()
-    let tx_input_hash = utils.keccak256(tx_input)
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain_id, multisig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, eth_amt, data, nonce, expiry)
     
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
-
     let msg_hash_bin = ethers.utils.arrayify(msg_hash);
 
-    for (signer of signers) {
-        const raw_sig = await signer.signMessage(msg_hash_bin)
-        const split_sig = utils.splitSignature(raw_sig)
-
-        v_arr.push(split_sig.v)
-        r_arr.push(split_sig.r)
-        s_arr.push(split_sig.s)
-    }
-
+    const [v_arr, r_arr, s_arr] = await sign(signers, msg_hash_bin)
     await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
 
     bob_rico_2 = await rico.balanceOf(bob.address)
@@ -97,41 +69,14 @@ TestHarness.test('msig rejects expired tx', {
     const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
     const nonce = await multisig.nonce()
 
-    const v_arr = []
-    const r_arr = []
-    const s_arr = []
-
-    let domain_data = EIP712DOMAINTYPE_HASH
-                   + NAME_HASH.slice(2) 
-                   + VERSION_HASH.slice(2)
-                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
-                   + multisig.address.slice(2).padStart(64, '0')
-                   + SALT.slice(2)
-    domain_data = domain_data.toLowerCase()
-    DOMAIN_SEPARATOR = utils.keccak256(domain_data)
-    
-    let tx_input = TXTYPE_HASH
-                + rico.address.slice(2).padStart(64, '0')
-                + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
-                + utils.keccak256(data).slice(2)
-                + utils.hexlify(nonce).slice(2).padStart(64, '0')
-                + utils.hexlify(expiry).slice(2).padStart(64, '0')
-    tx_input = tx_input.toLowerCase()
-    let tx_input_hash = utils.keccak256(tx_input)
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain_id, multisig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, eth_amt, data, nonce, expiry)
     
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
-
     let msg_hash_bin = ethers.utils.arrayify(msg_hash);
 
-    for (signer of signers) {
-        const raw_sig = await signer.signMessage(msg_hash_bin)
-        const split_sig = utils.splitSignature(raw_sig)
-
-        v_arr.push(split_sig.v)
-        r_arr.push(split_sig.r)
-        s_arr.push(split_sig.s)
-    }
+    const [v_arr, r_arr, s_arr] = await sign(signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
     try {
         await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
@@ -160,41 +105,14 @@ TestHarness.test('msig accepts valid non-zero expiry', {
     bob_rico_1 = await rico.balanceOf(bob.address)
     assert.equal(bob_rico_1, 0)
 
-    const v_arr = []
-    const r_arr = []
-    const s_arr = []
-
-    let domain_data = EIP712DOMAINTYPE_HASH
-                   + NAME_HASH.slice(2) 
-                   + VERSION_HASH.slice(2)
-                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
-                   + multisig.address.slice(2).padStart(64, '0')
-                   + SALT.slice(2)
-    domain_data = domain_data.toLowerCase()
-    DOMAIN_SEPARATOR = utils.keccak256(domain_data)
-    
-    let tx_input = TXTYPE_HASH
-                + rico.address.slice(2).padStart(64, '0')
-                + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
-                + utils.keccak256(data).slice(2)
-                + utils.hexlify(nonce).slice(2).padStart(64, '0')
-                + utils.hexlify(expiry).slice(2).padStart(64, '0')
-    tx_input = tx_input.toLowerCase()
-    let tx_input_hash = utils.keccak256(tx_input)
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain_id, multisig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, eth_amt, data, nonce, expiry)
     
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
-
     let msg_hash_bin = ethers.utils.arrayify(msg_hash);
 
-    for (signer of signers) {
-        const raw_sig = await signer.signMessage(msg_hash_bin)
-        const split_sig = utils.splitSignature(raw_sig)
-
-        v_arr.push(split_sig.v)
-        r_arr.push(split_sig.r)
-        s_arr.push(split_sig.s)
-    }
+    const [v_arr, r_arr, s_arr] = await sign(signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
     await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
 
@@ -259,3 +177,36 @@ TestHarness.test('fail create member addresses wrong order', {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
     }
 })
+
+// Test Helper Functions 
+function createDomainSeparator(domain_type_hash, name_hash, version_hash, chain_id, address, salt) {
+    const domain_data = domain_type_hash
+                   + name_hash.slice(2) 
+                   + version_hash.slice(2)
+                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
+                   + address.slice(2).padStart(64, '0')
+                   + salt.slice(2)
+    return utils.keccak256(domain_data.toLowerCase())
+}
+
+function createTransactionHash(tx_type_hash, target_address, amount, data, nonce, expiry) {
+     let tx_input = tx_type_hash
+                + target_address.slice(2).padStart(64, '0')
+                + utils.hexlify(amount).slice(2).padStart(64, '0')
+                + utils.keccak256(data).slice(2)
+                + utils.hexlify(nonce).slice(2).padStart(64, '0')
+                + utils.hexlify(expiry).slice(2).padStart(64, '0')
+    return utils.keccak256(tx_input.toLowerCase())
+}
+
+sign = async(signers, msg_hash) => {
+    const [v, r, s] = [[], [], []]
+    for (signer of signers) {
+        const raw_sig = await signer.signMessage(msg_hash)
+        const split_sig = utils.splitSignature(raw_sig)
+        v.push(split_sig.v)
+        r.push(split_sig.r)
+        s.push(split_sig.s)
+    }
+    return [v, r, s]
+}
