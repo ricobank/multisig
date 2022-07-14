@@ -8,7 +8,7 @@ const { send, wad } = require('minihat')
 const TestHarness = require('./test-harness')
 
 let DOMAIN_SEPARATOR
-const TXTYPE_HASH           = '0xe7beff35c01d1bb188c46fbae3d80f308d2600ba612c687a3e61446e0dffda0b'
+const TXTYPE_HASH           = '0x1c0c624cfeaf296646eaf07ff3cfb2d1c85be20b6c4e8ac4e58683aa231be09b'
 const NAME_HASH             = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
 const VERSION_HASH          = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6'
 const EIP712DOMAINTYPE_HASH = '0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472'
@@ -23,17 +23,15 @@ const sorted_participants = (participants) => {
 
 TestHarness.test('msig moves tokens', {
 }, async (harness, assert) => {
-    console.log('in first test')
 
     const [ali, bob, cat, dan] = await ethers.getSigners()
     const threshold = 3
-    const executor = ali.address
     const rico_amt = wad(100)
     const eth_amt  = wad(0)
     const chain_id = await hh.network.config.chainId;
     const rico = harness.rico
     const data = rico.interface.encodeFunctionData("transfer", [ bob.address, rico_amt ])
-
+    const expiry = BigNumber.from(0) // 0 = no expiry
     const {signers, members} = sorted_participants([ali, bob, cat])
     const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
     const nonce = await multisig.nonce()
@@ -60,6 +58,7 @@ TestHarness.test('msig moves tokens', {
                 + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
                 + utils.keccak256(data).slice(2)
                 + utils.hexlify(nonce).slice(2).padStart(64, '0')
+                + utils.hexlify(expiry).slice(2).padStart(64, '0')
     tx_input = tx_input.toLowerCase()
     let tx_input_hash = utils.keccak256(tx_input)
     
@@ -77,7 +76,127 @@ TestHarness.test('msig moves tokens', {
         s_arr.push(split_sig.s)
     }
 
-    await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data,  {gasLimit: 10000000})
+    await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
+
+    bob_rico_2 = await rico.balanceOf(bob.address)
+    assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
+})
+
+TestHarness.test('msig rejects expired tx', {
+}, async (harness, assert) => {
+    const now = Date.now()
+    const expiry = BigNumber.from(now).sub(1)
+    const [ali, bob, cat] = await ethers.getSigners()
+    const threshold = 3
+    const rico_amt = wad(100)
+    const eth_amt  = wad(0)
+    const chain_id = await hh.network.config.chainId;
+    const rico = harness.rico
+    const data = rico.interface.encodeFunctionData("transfer", [ bob.address, rico_amt ])
+    const {signers, members} = sorted_participants([ali, bob, cat])
+    const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
+    const nonce = await multisig.nonce()
+
+    const v_arr = []
+    const r_arr = []
+    const s_arr = []
+
+    let domain_data = EIP712DOMAINTYPE_HASH
+                   + NAME_HASH.slice(2) 
+                   + VERSION_HASH.slice(2)
+                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
+                   + multisig.address.slice(2).padStart(64, '0')
+                   + SALT.slice(2)
+    domain_data = domain_data.toLowerCase()
+    DOMAIN_SEPARATOR = utils.keccak256(domain_data)
+    
+    let tx_input = TXTYPE_HASH
+                + rico.address.slice(2).padStart(64, '0')
+                + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
+                + utils.keccak256(data).slice(2)
+                + utils.hexlify(nonce).slice(2).padStart(64, '0')
+                + utils.hexlify(expiry).slice(2).padStart(64, '0')
+    tx_input = tx_input.toLowerCase()
+    let tx_input_hash = utils.keccak256(tx_input)
+    
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash);
+
+    for (signer of signers) {
+        const raw_sig = await signer.signMessage(msg_hash_bin)
+        const split_sig = utils.splitSignature(raw_sig)
+
+        v_arr.push(split_sig.v)
+        r_arr.push(split_sig.r)
+        s_arr.push(split_sig.s)
+    }
+    await ethers.provider.send("evm_setNextBlockTimestamp", [now])
+    try {
+        await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
+        assert.fail()
+    } catch(e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/expied'")
+    }
+})
+
+TestHarness.test('msig accepts valid non-zero expiry', {
+}, async (harness, assert) => {
+    const now = Date.now()
+    const expiry = BigNumber.from(now).add(1)
+    const [ali, bob, cat] = await ethers.getSigners()
+    const threshold = 3
+    const rico_amt = wad(100)
+    const eth_amt  = wad(0)
+    const chain_id = await hh.network.config.chainId;
+    const rico = harness.rico
+    const data = rico.interface.encodeFunctionData("transfer", [ bob.address, rico_amt ])
+    const {signers, members} = sorted_participants([ali, bob, cat])
+    const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
+    const nonce = await multisig.nonce()
+    await send(rico.transfer, multisig.address, rico_amt)
+
+    bob_rico_1 = await rico.balanceOf(bob.address)
+    assert.equal(bob_rico_1, 0)
+
+    const v_arr = []
+    const r_arr = []
+    const s_arr = []
+
+    let domain_data = EIP712DOMAINTYPE_HASH
+                   + NAME_HASH.slice(2) 
+                   + VERSION_HASH.slice(2)
+                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
+                   + multisig.address.slice(2).padStart(64, '0')
+                   + SALT.slice(2)
+    domain_data = domain_data.toLowerCase()
+    DOMAIN_SEPARATOR = utils.keccak256(domain_data)
+    
+    let tx_input = TXTYPE_HASH
+                + rico.address.slice(2).padStart(64, '0')
+                + utils.hexlify(eth_amt).slice(2).padStart(64, '0')
+                + utils.keccak256(data).slice(2)
+                + utils.hexlify(nonce).slice(2).padStart(64, '0')
+                + utils.hexlify(expiry).slice(2).padStart(64, '0')
+    tx_input = tx_input.toLowerCase()
+    let tx_input_hash = utils.keccak256(tx_input)
+    
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash);
+
+    for (signer of signers) {
+        const raw_sig = await signer.signMessage(msg_hash_bin)
+        const split_sig = utils.splitSignature(raw_sig)
+
+        v_arr.push(split_sig.v)
+        r_arr.push(split_sig.r)
+        s_arr.push(split_sig.s)
+    }
+    await ethers.provider.send("evm_setNextBlockTimestamp", [now])
+    await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
 
     bob_rico_2 = await rico.balanceOf(bob.address)
     assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
