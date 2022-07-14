@@ -137,7 +137,7 @@ TestHarness.test('msig rejects expired tx', {
         await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
         assert.fail()
     } catch(e) {
-        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/expied'")
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/expired'")
     }
 })
 

@@ -66,7 +66,7 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
     msg_hash: bytes32 = self.prefix(sum_hash)
     last:     address = empty(address)
 
-    assert expiry >= block.timestamp or expiry == 0, 'err/expied'
+    assert expiry >= block.timestamp or expiry == 0, 'err/expired'
 
     for i in range(MAX_OWNERS):
         if i >= self.threshold:
