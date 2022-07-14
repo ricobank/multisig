@@ -18,6 +18,7 @@ event Executed:
     target: indexed(address)
     amount: uint256
     data:   Bytes[2000]
+    success: indexed(bool)
 
 members:   public(DynArray[address, MAX_OWNERS])
 is_member: public(HashMap[address, bool])
@@ -74,8 +75,8 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
         last = addr
 
     self.nonce += 1
-    raw_call(target, data, value=amount)
-    log Executed(msg.sender, target, amount, data)
+    success: bool = raw_call(target, data, value=amount, revert_on_failure=False)
+    log Executed(msg.sender, target, amount, data, success)
 
 @external
 @payable

@@ -23,11 +23,8 @@ const sorted_participants = (participants) => {
 
 TestHarness.test('msig moves tokens', {
 }, async (harness, assert) => {
-    console.log('in first test')
-
     const [ali, bob, cat, dan] = await ethers.getSigners()
     const threshold = 3
-    const executor = ali.address
     const rico_amt = wad(100)
     const eth_amt  = wad(0)
     const chain_id = await hh.network.config.chainId;
@@ -77,10 +74,16 @@ TestHarness.test('msig moves tokens', {
         s_arr.push(split_sig.s)
     }
 
-    await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data,  {gasLimit: 10000000})
+    const block = await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data,  {gasLimit: 10000000})
 
     bob_rico_2 = await rico.balanceOf(bob.address)
     assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
+    const execute_topics = block.events.find(event => event.event === 'Executed').args
+    assert.equal(execute_topics.sender, multisig.signer.address)
+    assert.equal(execute_topics.target, rico.address)
+    assert.equal(execute_topics.amount, 0)
+    assert.equal(execute_topics.data, data)
+    assert.equal(execute_topics.success, true)
 })
 
 TestHarness.test('insufficient members', {
