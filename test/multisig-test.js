@@ -31,7 +31,7 @@ TestHarness.test('msig moves tokens', {
     const chain_id = await hh.network.config.chainId;
     const rico = harness.rico
     const data = rico.interface.encodeFunctionData("transfer", [ bob.address, rico_amt ])
-    const expiry = BigNumber.from(0) // 0 = no expiry
+    const expiry = BigNumber.from(Date.now()).add(10000) // long enough not to expire
     const {signers, members} = sorted_participants([ali, bob, cat])
     const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
     const nonce = await multisig.nonce()
@@ -129,7 +129,7 @@ TestHarness.test('re-throw if raw call reverts', {
     const chain_id = await hh.network.config.chainId;
     const rico = harness.rico
     const data = rico.interface.encodeFunctionData("transfer", [ bob.address, rico_amt ])
-    const expiry = BigNumber.from(0)
+    const expiry = BigNumber.from(Date.now()).add(10000)
     const {signers, members} = sorted_participants([ali, bob, cat])
     const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
     const nonce = await multisig.nonce()
