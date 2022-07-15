@@ -4,7 +4,7 @@
 EIP712DOMAINTYPE_HASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
 NAME_HASH:             constant(bytes32) = keccak256("tiny multisig")
 VERSION_HASH:          constant(bytes32) = keccak256("1")
-TXTYPE_HASH:           constant(bytes32) = keccak256("MultiSigTransaction(address destination,uint256 value,bytes data,uint256 nonce, uint256 expiry)")
+TXTYPE_HASH:           constant(bytes32) = keccak256("MultiSigTransaction(address destination,uint256 value,bytes data,uint256 nonce,uint256 expiry)")
 SALT:                  constant(bytes32) = 0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650
 MAX_OWNERS:            constant(uint256) = 16
 DOMAIN_SEPARATOR:      immutable(bytes32)

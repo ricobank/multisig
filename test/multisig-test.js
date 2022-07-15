@@ -8,7 +8,7 @@ const { send, wad } = require('minihat')
 const TestHarness = require('./test-harness')
 
 let DOMAIN_SEPARATOR
-const TXTYPE_HASH           = '0x1c0c624cfeaf296646eaf07ff3cfb2d1c85be20b6c4e8ac4e58683aa231be09b'
+const TXTYPE_HASH           = '0xb7267299ee78157c26d16798607b94eb975a922c460faff36ef284150d471f6d'
 const NAME_HASH             = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
 const VERSION_HASH          = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6'
 const EIP712DOMAINTYPE_HASH = '0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472'
