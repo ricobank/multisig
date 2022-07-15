@@ -120,6 +120,45 @@ TestHarness.test('msig accepts valid non-zero expiry', {
     assert.equal(bob_rico_2.sub(rico_amt).eq(bob_rico_1), true)
 })
 
+TestHarness.test('re-throw if raw call reverts', {
+}, async (harness, assert) => {
+    const [ali, bob, cat] = await ethers.getSigners()
+    const threshold = 3
+    const rico_amt = wad(100)
+    const eth_amt  = wad(0)
+    const chain_id = await hh.network.config.chainId;
+    const rico = harness.rico
+    const data = rico.interface.encodeFunctionData("transfer", [ bob.address, rico_amt ])
+    const expiry = BigNumber.from(0)
+    const {signers, members} = sorted_participants([ali, bob, cat])
+    const multisig = await harness.multisig_deployer.deploy(threshold, members, chain_id)
+    const nonce = await multisig.nonce()
+    await send(rico.transfer, multisig.address, rico_amt.sub(10))
+
+    bob_rico_1 = await rico.balanceOf(bob.address)
+    assert.equal(bob_rico_1, 0)
+
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain_id, multisig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, rico.address, eth_amt, data, nonce, expiry)
+    
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash);
+
+    const [v_arr, r_arr, s_arr] = await sign(signers, msg_hash_bin)
+    try {
+        // should fail because rico.transfer reverts due to insufficient balance
+        await send(multisig.exec, v_arr, r_arr, s_arr, rico.address, eth_amt, data, expiry, {gasLimit: 10000000})
+        assert.fail()
+    } catch(e) {
+        // pass
+    }
+
+    bob_rico_2 = await rico.balanceOf(bob.address)
+    assert.equal(bob_rico_2.eq(bob_rico_1), true)
+    assert.equal(nonce.eq(await multisig.nonce()), true)
+})
+
 TestHarness.test('insufficient members', {
 }, async (harness, assert) => {
 
