@@ -24,8 +24,8 @@ class TestHarness {
     async bootstrap() {
         console.log('bootstrap harness')
         const [signer, ali, bob, cat] = await ethers.getSigners()
-        let msig = require('../out/SrcOutput.json') // todo dirname
-        msig = msig.contracts['src/Multisig.vy'].Multisig // todo ugly
+        let msig = require('../out/SrcOutput.json')
+        msig = Object.values(msig.contracts)[0].Multisig
         const msig_factory = new ethers.ContractFactory(msig.abi, msig.evm.bytecode, signer)
         const {members, signers} = sorted_participants([ali, bob, cat])
         this.msig_factory = msig_factory

@@ -13,14 +13,7 @@ const VERSION_HASH          = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307c
 const EIP712DOMAINTYPE_HASH = '0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472'
 const SALT                  = '0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650'
 
-const sorted_participants = (participants) => {
-    const signers = participants.sort((a, b) =>
-        (BigNumber.from(a.address).gt(BigNumber.from(b.address))) ? 1 : -1)
-    const members = signers.map(signer => signer.address)
-    return {signers, members}
-}
-
-TestHarness.test('msig moves ether', async(harness, assert) => {
+TestHarness.test('msig moves ether', async (harness, assert) => {
     // Setup
     const chain_id = await hh.network.config.chainId
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
@@ -34,7 +27,7 @@ TestHarness.test('msig moves ether', async(harness, assert) => {
     })
     // Create Transaction
     const nonce = await msig.nonce()
-    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         chain_id, msig.address, SALT)
     const tx_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce, expiry)
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash.slice(2)
@@ -43,7 +36,7 @@ TestHarness.test('msig moves ether', async(harness, assert) => {
 
     // Sign Transaction
     const [v, r, s] = await sign(harness.signers, msg_hash_bin)
-    await send(msig.exec, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, {gasLimit: 10000000})
+    await send(msig.exec, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
     // Check that the ether was moved
     const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
@@ -82,7 +75,7 @@ TestHarness.test('msig can call other msig', {
     let msg_hash1 = utils.keccak256(input1)
     let msg_hash_bin1 = ethers.utils.arrayify(msg_hash1)
     const [v1, r1, s1] = await sign(harness.signers, msg_hash_bin1)
-    await send(msig1.exec, v1, r1, s1, msig2.address, 0, tx2, expiry, {gasLimit: 10000000})
+    await send(msig1.exec, v1, r1, s1, msig2.address, 0, tx2, expiry, { gasLimit: 10000000 })
     // Check that the ether was moved
     const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
@@ -96,10 +89,10 @@ TestHarness.test('msig rejects expired tx', {
     const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
     const nonce = await msig.nonce()
 
-    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         chain_id, msig.address, SALT)
     const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
-    
+
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
     let msg_hash_bin = ethers.utils.arrayify(msg_hash)
@@ -107,9 +100,9 @@ TestHarness.test('msig rejects expired tx', {
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, {gasLimit: 10000000})
+        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
-    } catch(e) {
+    } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/expired'")
     }
 })
@@ -127,17 +120,17 @@ TestHarness.test('msig accepts valid non-zero expiry', {
         value: wad(1)
     })
 
-    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         chain_id, msig.address, SALT)
     const tx_input_hash = createTransactionHash(TXTYPE_HASH, harness.members[1], wad(1), ethers.constants.HashZero, nonce, expiry)
-    
+
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
     let msg_hash_bin = ethers.utils.arrayify(msg_hash)
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
-    await send(msig.exec, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, {gasLimit: 10000000})
+    await send(msig.exec, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
     const new_balance = await ethers.provider.getBalance(harness.members[1])
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
 })
@@ -151,10 +144,10 @@ TestHarness.test('re-throw if raw call reverts', {
     const nonce = await msig.nonce()
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
 
-    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         chain_id, msig.address, SALT)
     const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
-    
+
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
     let msg_hash_bin = ethers.utils.arrayify(msg_hash)
@@ -162,9 +155,9 @@ TestHarness.test('re-throw if raw call reverts', {
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     // should revert as msig has no ether to send
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, {gasLimit: 10000000})
+        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
-    } catch(e) {
+    } catch (e) {
         // pass
     }
     const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
@@ -209,7 +202,7 @@ TestHarness.test('fail create with threshold > members', {
     try {
         await harness.msig_factory.deploy(threshold, harness.members, chain_id)
         assert.fail() // ensure failure if doesn't throw
-    } catch (e) { 
+    } catch (e) {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/min_owners'")
     }
 })
@@ -221,7 +214,7 @@ TestHarness.test('fail create member addresses wrong order', {
     try {
         await harness.msig_factory.deploy(threshold, harness.members.reverse(), chain_id)
         assert.fail() // ensure failure if doesn't throw
-    } catch (e) { 
+    } catch (e) {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
     }
 })
@@ -229,25 +222,25 @@ TestHarness.test('fail create member addresses wrong order', {
 // Test Helper Functions 
 function createDomainSeparator(domain_type_hash, name_hash, version_hash, chain_id, address, salt) {
     const domain_data = domain_type_hash
-                   + name_hash.slice(2) 
-                   + version_hash.slice(2)
-                   + utils.hexlify(chain_id).slice(2).padStart(64, '0')
-                   + address.slice(2).padStart(64, '0')
-                   + salt.slice(2)
+        + name_hash.slice(2)
+        + version_hash.slice(2)
+        + utils.hexlify(chain_id).slice(2).padStart(64, '0')
+        + address.slice(2).padStart(64, '0')
+        + salt.slice(2)
     return utils.keccak256(domain_data.toLowerCase())
 }
 
 function createTransactionHash(tx_type_hash, target_address, amount, data, nonce, expiry) {
-     let tx_input = tx_type_hash
-                + target_address.slice(2).padStart(64, '0')
-                + utils.hexlify(amount).slice(2).padStart(64, '0')
-                + utils.keccak256(data).slice(2)
-                + utils.hexlify(nonce).slice(2).padStart(64, '0')
-                + utils.hexlify(expiry).slice(2).padStart(64, '0')
+    let tx_input = tx_type_hash
+        + target_address.slice(2).padStart(64, '0')
+        + utils.hexlify(amount).slice(2).padStart(64, '0')
+        + utils.keccak256(data).slice(2)
+        + utils.hexlify(nonce).slice(2).padStart(64, '0')
+        + utils.hexlify(expiry).slice(2).padStart(64, '0')
     return utils.keccak256(tx_input.toLowerCase())
 }
 
-sign = async(signers, msg_hash) => {
+sign = async (signers, msg_hash) => {
     const [v, r, s] = [[], [], []]
     for (signer of signers) {
         const raw_sig = await signer.signMessage(msg_hash)
