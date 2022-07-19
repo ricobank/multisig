@@ -4,10 +4,17 @@ const dpack = require('@etherpacks/dpack')
 const hh = require('hardhat')
 const ethers = hh.ethers
 const { send, wad } = require('minihat')
+const {BigNumber} = require('ethers');
 
 const tapzero = require('tapzero');
 const testHarness = require('tapzero/harness');
 
+const sorted_participants = (participants) => {
+    const signers = participants.sort((a, b) =>
+        (BigNumber.from(a.address).gt(BigNumber.from(b.address))) ? 1 : -1)
+    const members = signers.map(signer => signer.address)
+    return {signers, members}
+}
 // This only gives equivalent to beforeEach() rather than before() so no snapshot reverts.
 // Mocha is easier to use, has before(), but many dependencies. Which compliments snek best?
 class TestHarness {
@@ -18,9 +25,17 @@ class TestHarness {
 
     async bootstrap() {
         console.log('bootstrap harness')
-        const [signer] = await ethers.getSigners()
+        const [signer, ali, bob, cat] = await ethers.getSigners()
         const pack = await hh.run('mock-deploy')
         const dapp = await dpack.load(pack, hh.ethers, signer)
+        // NEW 
+        let msig = require('../out/SrcOutput.json') // todo dirname
+        msig = msig.contracts['src/Multisig.vy'].Multisig
+        const msig_factory = new ethers.ContractFactory(msig.abi, msig.evm.bytecode, signer)
+        const {members, signers} = sorted_participants([ali, bob, cat])
+        this.msig_factory = msig_factory
+        this.signers = signers
+        this.members = members
         this.rico = dapp.rico
         this.multisig_deployer = await dapp._types['Multisig']
         await send(this.rico.mint, signer.address, wad(10000))
