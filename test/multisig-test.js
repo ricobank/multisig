@@ -21,6 +21,35 @@ const sorted_participants = (participants) => {
     return {signers, members}
 }
 
+TestHarness.test('msig moves ether', async(harness, assert) => {
+    // Setup
+    const chain_id = await hh.network.config.chainId;
+    const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    // Deploy new multisig contract
+    const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
+    // send new msig some eth
+    await harness.signers[0].sendTransaction({
+        to: msig.address,
+        value: wad(1)
+    })
+    // Create Transaction
+    const expiry = BigNumber.from(Date.now()).add(10000)
+    const nonce = await msig.nonce()
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, 
+        chain_id, msig.address, SALT);
+    const tx_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce, expiry)
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash);
+
+    // Sign Transaction
+    const [v, r, s] = await sign(harness.signers, msg_hash_bin)
+    await send(msig.exec, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, {gasLimit: 10000000})
+    // Check that the ether was moved
+    const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
+})
+
 TestHarness.test('msig moves tokens', {
 }, async (harness, assert) => {
 
