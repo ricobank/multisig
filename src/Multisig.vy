@@ -50,6 +50,7 @@ def prefix(hash: bytes32) -> bytes32:
     return keccak256(concat(convert("\x19Ethereum Signed Message:\n32", Bytes[32]), hash))
 
 @external
+@payable
 def exec( v: DynArray[uint256, MAX_OWNERS],
           r: DynArray[uint256, MAX_OWNERS],
           s: DynArray[uint256, MAX_OWNERS],
