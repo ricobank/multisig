@@ -115,10 +115,6 @@ TestHarness.test('msig accepts valid non-zero expiry', {
     const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
     const nonce = await msig.nonce()
     const prior_balance = await ethers.provider.getBalance(harness.members[1])
-    await harness.signers[0].sendTransaction({
-        to: msig.address,
-        value: wad(1)
-    })
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         chain_id, msig.address, SALT)
@@ -130,7 +126,7 @@ TestHarness.test('msig accepts valid non-zero expiry', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
-    await send(msig.exec, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+    await send(msig.exec, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, { value: wad(1), gasLimit: 10000000 })
     const new_balance = await ethers.provider.getBalance(harness.members[1])
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
 })
