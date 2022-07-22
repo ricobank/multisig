@@ -32,6 +32,7 @@ class TestHarness {
         this.signers = signers
         this.members = members
         this.chainId = hh.network.config.chainId
+        this.sort_participants = sorted_participants
         // await snapshot(hh)
     }
 

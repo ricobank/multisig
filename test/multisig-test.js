@@ -158,12 +158,50 @@ TestHarness.test('re-throw if raw call reverts', {
 
 TestHarness.test('insufficient members', {
 }, async (harness, assert) => {
+    const expiry = BigNumber.from(Date.now()).add(10000)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const nonce = await msig.nonce()
+
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
+        harness.chainId, msig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash)
+
+    const [v_arr, r_arr, s_arr] = await sign(harness.signers.slice(1), msg_hash_bin)
+    try {
+        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        assert.fail()
+    } catch (e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/num_sigs'")
+    }
 
 })
 
 TestHarness.test('wrong members', {
 }, async (harness, assert) => {
+    const expiry = BigNumber.from(Date.now()).add(10000)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const nonce = await msig.nonce()
 
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
+        harness.chainId, msig.address, SALT)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash)
+
+    const [bad_signer, good_signer_1, good_signer_2] = await ethers.getSigners()
+    const [v_arr, r_arr, s_arr] = await sign(harness.sort_participants([bad_signer, good_signer_1, good_signer_2]).signers, msg_hash_bin)
+    try {
+        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        assert.fail()
+    } catch (e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/not_member'")
+    }
 })
 
 TestHarness.test('too many members', {
