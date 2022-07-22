@@ -7,19 +7,18 @@ const { send, wad } = require('minihat')
 
 const TestHarness = require('./test-harness')
 
-const TXTYPE_HASH           = '0xb7267299ee78157c26d16798607b94eb975a922c460faff36ef284150d471f6d'
-const NAME_HASH             = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
-const VERSION_HASH          = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6'
+const TXTYPE_HASH = '0xb7267299ee78157c26d16798607b94eb975a922c460faff36ef284150d471f6d'
+const NAME_HASH = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
+const VERSION_HASH = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6'
 const EIP712DOMAINTYPE_HASH = '0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472'
-const SALT                  = '0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650'
+const SALT = '0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650'
 
 TestHarness.test('msig moves ether', async (harness, assert) => {
     // Setup
-    const chain_id = await hh.network.config.chainId
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     const expiry = BigNumber.from(Date.now()).add(10000)
     // Deploy new multisig contract
-    const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
     // send new msig some eth
     await harness.signers[0].sendTransaction({
         to: msig.address,
@@ -28,7 +27,7 @@ TestHarness.test('msig moves ether', async (harness, assert) => {
     // Create Transaction
     const nonce = await msig.nonce()
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
-        chain_id, msig.address, SALT)
+        harness.chainId, msig.address, SALT)
     const tx_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce, expiry)
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -45,12 +44,11 @@ TestHarness.test('msig moves ether', async (harness, assert) => {
 TestHarness.test('msig can call other msig', {
 }, async (harness, assert) => {
     // Setup
-    const chain_id = await hh.network.config.chainId
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     const expiry = BigNumber.from(Date.now()).add(10000)
     // Deploy two msigs
-    const msig1 = await harness.msig_factory.deploy(3, harness.members, chain_id)
-    const msig2 = await harness.msig_factory.deploy(3, harness.members, chain_id)
+    const msig1 = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig2 = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
     // Send some eth to msig2
     await harness.signers[0].sendTransaction({
         to: msig2.address,
@@ -59,7 +57,7 @@ TestHarness.test('msig can call other msig', {
     // Sign Msig2 Transaction
     const nonce2 = await msig2.nonce()
     const DOMAIN_SEPARATOR2 = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
-        chain_id, msig2.address, SALT)
+        harness.chainId, msig2.address, SALT)
     const tx_hash2 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce2, expiry)
     let input2 = '0x19' + '01' + DOMAIN_SEPARATOR2.slice(2) + tx_hash2.slice(2)
     let msg_hash2 = utils.keccak256(input2)
@@ -69,7 +67,7 @@ TestHarness.test('msig can call other msig', {
     // Sign Msig1 Transaction
     const nonce1 = await msig1.nonce()
     const DOMAIN_SEPARATOR1 = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
-        chain_id, msig1.address, SALT)
+        harness.chainId, msig1.address, SALT)
     const tx_hash1 = createTransactionHash(TXTYPE_HASH, msig2.address, 0, tx2, nonce1, expiry)
     let input1 = '0x19' + '01' + DOMAIN_SEPARATOR1.slice(2) + tx_hash1.slice(2)
     let msg_hash1 = utils.keccak256(input1)
@@ -83,14 +81,13 @@ TestHarness.test('msig can call other msig', {
 
 TestHarness.test('msig rejects expired tx', {
 }, async (harness, assert) => {
-    const chain_id = await hh.network.config.chainId
     const now = Date.now()
     const expiry = BigNumber.from(now).sub(1)
-    const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
     const nonce = await msig.nonce()
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
-        chain_id, msig.address, SALT)
+        harness.chainId, msig.address, SALT)
     const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
@@ -109,15 +106,14 @@ TestHarness.test('msig rejects expired tx', {
 
 TestHarness.test('msig accepts valid non-zero expiry', {
 }, async (harness, assert) => {
-    const chain_id = await hh.network.config.chainId
     const now = Date.now()
     const expiry = BigNumber.from(now).add(1)
-    const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
     const nonce = await msig.nonce()
     const prior_balance = await ethers.provider.getBalance(harness.members[1])
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
-        chain_id, msig.address, SALT)
+        harness.chainId, msig.address, SALT)
     const tx_input_hash = createTransactionHash(TXTYPE_HASH, harness.members[1], wad(1), ethers.constants.HashZero, nonce, expiry)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
@@ -133,15 +129,14 @@ TestHarness.test('msig accepts valid non-zero expiry', {
 
 TestHarness.test('re-throw if raw call reverts', {
 }, async (harness, assert) => {
-    const chain_id = await hh.network.config.chainId
     const now = Date.now()
     const expiry = BigNumber.from(now).add(10000)
-    const msig = await harness.msig_factory.deploy(3, harness.members, chain_id)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
     const nonce = await msig.nonce()
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
-        chain_id, msig.address, SALT)
+        harness.chainId, msig.address, SALT)
     const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
@@ -194,9 +189,8 @@ TestHarness.test('member addresses wrong order', {
 TestHarness.test('fail create with threshold > members', {
 }, async (harness, assert) => {
     const threshold = 4
-    const chain_id = await hh.network.config.chainId
     try {
-        await harness.msig_factory.deploy(threshold, harness.members, chain_id)
+        await harness.msig_factory.deploy(threshold, harness.members, harness.chainId)
         assert.fail() // ensure failure if doesn't throw
     } catch (e) {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/min_owners'")
@@ -206,9 +200,8 @@ TestHarness.test('fail create with threshold > members', {
 TestHarness.test('fail create member addresses wrong order', {
 }, async (harness, assert) => {
     const threshold = 3
-    const chain_id = await hh.network.config.chainId
     try {
-        await harness.msig_factory.deploy(threshold, harness.members.reverse(), chain_id)
+        await harness.msig_factory.deploy(threshold, harness.members.reverse(), harness.chainId)
         assert.fail() // ensure failure if doesn't throw
     } catch (e) {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
