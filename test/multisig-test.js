@@ -204,16 +204,6 @@ TestHarness.test('wrong members', {
     }
 })
 
-TestHarness.test('too many members', {
-}, async (harness, assert) => {
-
-})
-
-TestHarness.test('too many members', {
-}, async (harness, assert) => {
-
-})
-
 TestHarness.test('repeated members', {
 }, async (harness, assert) => {
 
@@ -221,6 +211,18 @@ TestHarness.test('repeated members', {
 
 TestHarness.test('member addresses wrong order', {
 }, async (harness, assert) => {
+
+})
+
+TestHarness.test('fail create too many members', {
+}, async (harness, assert) => {
+    const members = [...Array(17).keys()].map((_) => ethers.Wallet.createRandom());
+    try {
+        await harness.msig_factory.deploy(17, harness.sort_participants(members).members, harness.chainId)
+        assert.fail()
+    } catch (e) {
+        // pass
+    }
 
 })
 
