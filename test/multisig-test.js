@@ -6,7 +6,6 @@ const { BigNumber, utils } = require("ethers")
 const { send, wad } = require('minihat')
 
 const TestHarness = require('./test-harness')
-const { Test } = require('tapzero')
 
 const TXTYPE_HASH           = '0xb7267299ee78157c26d16798607b94eb975a922c460faff36ef284150d471f6d'
 const NAME_HASH             = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
@@ -314,6 +313,7 @@ TestHarness.test('fail execute cross chainID replay', {
     hh.network.chainId = 42069
     try {
         await send(msig.exec, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
+        assert.fail()
     } catch(e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/not_member'")
     }
