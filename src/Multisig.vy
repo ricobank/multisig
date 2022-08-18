@@ -82,6 +82,7 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
     raw_call(target, data, value=amount)  # Default is revert on failure
     log Executed(msg.sender, target, amount, data)
 
+@view
 @internal
 def compute_domain_separator() -> bytes32:
     if chain.id == self.deployed_chain_id:
