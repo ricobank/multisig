@@ -34,7 +34,8 @@ def __init__(snek: Snek):
     members.append(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
     members.append(0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
     members.append(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
-    args: Bytes[256] = _abi_encode(threshold, members)
+    chain_id: uint256 = 1
+    args: Bytes[256] = _abi_encode(threshold, members, chain_id)
     self.msig = Multisig(self.snek.make('Multisig', 'multisig', args))
 
 @external
@@ -51,7 +52,8 @@ def test_throw_high_threshold():
     members: DynArray[address, 3] = []
     members.append(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
     members.append(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
-    args: Bytes[256] = _abi_encode(threshold, members)
+    chain_id: uint256 = 1
+    args: Bytes[256] = _abi_encode(threshold, members, chain_id)
     self.msig = Multisig(self.snek.make('Multisig', 'multisig2', args))
 
 @external
@@ -60,7 +62,8 @@ def test_throw_repeat_addresses():
     members: DynArray[address, 3] = []
     members.append(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
     members.append(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
-    args: Bytes[256] = _abi_encode(threshold, members)
+    chain_id: uint256 = 1
+    args: Bytes[256] = _abi_encode(threshold, members, chain_id)
     self.msig = Multisig(self.snek.make('Multisig', 'multisig2', args))
 
 @external
@@ -70,7 +73,8 @@ def test_throw_address_order():
     members.append(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
     members.append(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
     members.append(0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
-    args: Bytes[256] = _abi_encode(threshold, members)
+    chain_id: uint256 = 1
+    args: Bytes[256] = _abi_encode(threshold, members, chain_id)
     self.msig = Multisig(self.snek.make('Multisig', 'multisig2', args))
 
 @external
@@ -94,5 +98,6 @@ def test_throw_too_many_members():
     members.append(0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC)
     members.append(0x70997970C51812dc3A010C7d01b50e0d17dc79C8)
     members.append(0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266)
-    args: Bytes[700] = _abi_encode(threshold, members)
+    chain_id: uint256 = 1
+    args: Bytes[700] = _abi_encode(threshold, members, chain_id)
     self.msig = Multisig(self.snek.make('Multisig', 'multisig2', args))

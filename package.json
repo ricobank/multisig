@@ -2,7 +2,10 @@
   "name": "vymultisig",
   "version": "0.0.1",
   "scripts": {
-    "initialize": "npm i",
+    "initialize": "npm i && npm run download-submodules && npm run install-submodules",
+    "download-submodules": "git submodule update --init --recursive --remote",
+    "install-submodules": "npm run init:gemfab",
+    "init:gemfab": "cd lib/gemfab && npm i && npm run build",
     "test": "snek test && cd test && node multisig-test.js",
     "test2": "node test/multisig-test.js",
     "test3": "snek test"

@@ -23,11 +23,11 @@ members:   public(DynArray[address, MAX_OWNERS])
 is_member: public(HashMap[address, bool])
 nonce:     public(uint256)
 threshold: public(uint256)
-deployed_chain_id: public(uint256)
 
 @external
 def __init__( threshold: uint256,
               members: DynArray[address, MAX_OWNERS],
+              chain_id: uint256
             ):
     assert len(members) <= MAX_OWNERS, 'err/max_owners'
     assert len(members) >= threshold, 'err/min_owners'
@@ -40,9 +40,8 @@ def __init__( threshold: uint256,
         last = owner
     self.members = members
     self.threshold = threshold
-    self.deployed_chain_id = chain.id
     DOMAIN_SEPARATOR = keccak256(_abi_encode(
-        EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain.id, self, SALT
+        EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain_id, self, SALT
     ))
 
 @pure
@@ -64,7 +63,7 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
        and len(s) == self.threshold, 'err/num_sigs'
 
     txn_hash: bytes32 = keccak256(_abi_encode(TXTYPE_HASH, target, amount, keccak256(data), self.nonce, expiry))
-    sum_hash: bytes32 = keccak256(concat(convert('\x19\x01', Bytes[2]), self.compute_domain_separator(), txn_hash))
+    sum_hash: bytes32 = keccak256(concat(convert('\x19\x01', Bytes[2]), DOMAIN_SEPARATOR, txn_hash))
     msg_hash: bytes32 = self.prefix(sum_hash)
     last:     address = empty(address)
 
@@ -81,16 +80,6 @@ def exec( v: DynArray[uint256, MAX_OWNERS],
     self.nonce += 1
     raw_call(target, data, value=amount)  # Default is revert on failure
     log Executed(msg.sender, target, amount, data)
-
-@view
-@internal
-def compute_domain_separator() -> bytes32:
-    if chain.id == self.deployed_chain_id:
-        return DOMAIN_SEPARATOR 
-    else:
-        return keccak256(_abi_encode(
-        EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, chain.id, self, SALT
-    ))
 
 @external
 @payable
