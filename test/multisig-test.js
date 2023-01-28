@@ -3,7 +3,7 @@
 const hh = require('hardhat')
 const ethers = hh.ethers
 const { BigNumber, utils } = require("ethers")
-const { send, wad } = require('minihat')
+const { send, wad, wait } = require('minihat')
 
 const TestHarness = require('./test-harness')
 
@@ -17,8 +17,9 @@ TestHarness.test('msig moves ether', async (harness, assert) => {
     // Setup
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     const expiry = BigNumber.from(Date.now()).add(10000)
+    const wait_secs = 604800
     // Deploy new multisig contract
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, wait_secs)
     // send new msig some eth
     await harness.signers[0].sendTransaction({
         to: msig.address,
@@ -35,10 +36,117 @@ TestHarness.test('msig moves ether', async (harness, assert) => {
 
     // Sign Transaction
     const [v, r, s] = await sign(harness.signers, msg_hash_bin)
-    await send(msig.exec, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
-    // Check that the ether was moved
-    const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    await send(msig.load, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
+    // Check that the ether was not moved
+    let new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    assert.equal(new_balance.sub(prior_balance).eq(wad(0)), true)
+
+    // attempt to execute the transaction before the wait period has completed
+    let next = await msig.next()
+    assert.equal(next.eq(0), true)
+    try {
+        await send(msig.fire, { gasLimit: 10000000 })
+        assert.fail()
+    } catch (e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/wait'")
+    }
+
+    next = await msig.next()
+    assert.equal(next.eq(0), true)
+
+    // wait beyond the wait period
+    wait(hh, wait_secs)
+    await send(msig.fire, { gasLimit: 10000000 })
+    new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
+
+    // check the loaded bolt was deleted
+    let bolt = await msig.line(0)
+    assert.equal(bolt.show.eq(0), true)
+})
+
+TestHarness.test('Early fire should not push next ahead', async (harness, assert) => {
+    // Setup
+    const wait_secs = 604800
+    // Deploy new multisig contract
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, wait_secs)
+    const next1 = await msig.next()
+    try {
+        await send(msig.fire, { gasLimit: 10000000 })
+        assert.fail()
+    } catch (e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/empty'")
+    }
+    const next2 = await msig.next()
+    assert.equal(next1.eq(next2), true)
+})
+
+TestHarness.test('add multiple calls to queue', async (harness, assert) => {
+    // Setup
+    const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    const expiry = BigNumber.from(Date.now()).add(10000)
+    const wait_secs = 604800
+    // Deploy new multisig contract
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, wait_secs)
+    // send new msig some eth
+    await harness.signers[0].sendTransaction({
+        to: msig.address,
+        value: wad(10)
+    })
+    // Create Transactions
+    const nonce1 = await msig.nonce()
+    const nonce2 = nonce1.add(1)
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
+        harness.chainId, msig.address, SALT)
+    const tx_hash1 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce1, expiry)
+    const tx_hash2 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce2, expiry)
+    let input1 = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash1.slice(2)
+    let input2 = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash2.slice(2)
+    let msg_hash1 = utils.keccak256(input1)
+    let msg_hash2 = utils.keccak256(input2)
+    let msg_hash_bin1 = ethers.utils.arrayify(msg_hash1)
+    let msg_hash_bin2 = ethers.utils.arrayify(msg_hash2)
+
+    // Sign and queue transactions
+    const [v, r, s] = await sign(harness.signers, msg_hash_bin1)
+    const [v2, r2, s2] = await sign(harness.signers, msg_hash_bin2)
+    await send(msig.load, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
+    await send(msig.load, v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
+
+    let nonce = await msig.nonce()
+    assert.equal(nonce.eq(2), true)
+
+    wait(hh, wait_secs - 10)
+
+    let next = await msig.next()
+    assert.equal(next.eq(0), true)
+
+    try {
+        await send(msig.fire, { gasLimit: 10000000 })
+        assert.fail()
+    } catch (e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/wait'")
+    }
+
+    wait(hh, 10)
+
+    await send(msig.fire, { gasLimit: 10000000 })
+    let new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
+    await send(msig.fire, { gasLimit: 10000000 })
+    new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
+    assert.equal(new_balance.sub(prior_balance).eq(wad(2)), true)
+    try {
+        await send(msig.fire, { gasLimit: 10000000 })
+        assert.fail()
+    } catch (e) {
+        assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/empty'")
+    }
+
+    const final_nonce = await msig.nonce()
+    const final_next = await msig.next()
+    assert.equal(final_nonce.eq(2), true)
+    assert.equal(final_next.eq(2), true)
 })
 
 TestHarness.test('msig can call other msig', {
@@ -47,8 +155,8 @@ TestHarness.test('msig can call other msig', {
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     const expiry = BigNumber.from(Date.now()).add(10000)
     // Deploy two msigs
-    const msig1 = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
-    const msig2 = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig1 = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
+    const msig2 = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     // Send some eth to msig2
     await harness.signers[0].sendTransaction({
         to: msig2.address,
@@ -63,7 +171,7 @@ TestHarness.test('msig can call other msig', {
     let msg_hash2 = utils.keccak256(input2)
     let msg_hash_bin2 = ethers.utils.arrayify(msg_hash2)
     const [v2, r2, s2] = await sign(harness.signers, msg_hash_bin2)
-    const tx2 = msig2.interface.encodeFunctionData("exec", [v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry])
+    const tx2 = msig2.interface.encodeFunctionData("load", [v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry])
     // Sign Msig1 Transaction
     const nonce1 = await msig1.nonce()
     const DOMAIN_SEPARATOR1 = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -73,7 +181,9 @@ TestHarness.test('msig can call other msig', {
     let msg_hash1 = utils.keccak256(input1)
     let msg_hash_bin1 = ethers.utils.arrayify(msg_hash1)
     const [v1, r1, s1] = await sign(harness.signers, msg_hash_bin1)
-    await send(msig1.exec, v1, r1, s1, msig2.address, 0, tx2, expiry, { gasLimit: 10000000 })
+    await send(msig1.load, v1, r1, s1, msig2.address, 0, tx2, expiry, { gasLimit: 10000000 })
+    await send(msig1.fire, { gasLimit: 10000000 })
+    await send(msig2.fire, { gasLimit: 10000000 })
     // Check that the ether was moved
     const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
@@ -83,7 +193,7 @@ TestHarness.test('msig rejects expired tx', {
 }, async (harness, assert) => {
     const now = Date.now()
     const expiry = BigNumber.from(now).sub(1)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -97,7 +207,7 @@ TestHarness.test('msig rejects expired tx', {
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/expired'")
@@ -108,7 +218,7 @@ TestHarness.test('msig accepts valid non-zero expiry', {
 }, async (harness, assert) => {
     const now = Date.now()
     const expiry = BigNumber.from(now).add(1)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
     const prior_balance = await ethers.provider.getBalance(harness.members[1])
 
@@ -122,7 +232,8 @@ TestHarness.test('msig accepts valid non-zero expiry', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
-    await send(msig.exec, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, { value: wad(1), gasLimit: 10000000 })
+    await send(msig.load, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, { value: wad(1), gasLimit: 10000000 })
+    await send(msig.fire, { gasLimit: 10000000 })
     const new_balance = await ethers.provider.getBalance(harness.members[1])
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
 })
@@ -131,8 +242,9 @@ TestHarness.test('re-throw if raw call reverts', {
 }, async (harness, assert) => {
     const now = Date.now()
     const expiry = BigNumber.from(now).add(10000)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
+    const next0 = await msig.next()
     const prior_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -144,22 +256,25 @@ TestHarness.test('re-throw if raw call reverts', {
     let msg_hash_bin = ethers.utils.arrayify(msg_hash)
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
-    // should revert as msig has no ether to send
+    // raw call should fail but tx should still clear a pending call and increment next
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
-        assert.fail()
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.fire, { gasLimit: 10000000 })
     } catch (e) {
         // pass
     }
+    const next1 = await msig.next()
+    const final_nonce = await msig.nonce()
     const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.eq(prior_balance), true)
-    assert.equal(nonce.eq(await msig.nonce()), true)
+    assert.equal(nonce.eq(final_nonce.sub(1)), true)
+    assert.equal(next1.eq(next0.add(1)), true)
 })
 
 TestHarness.test('insufficient members', {
 }, async (harness, assert) => {
     const expiry = BigNumber.from(Date.now()).add(10000)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -172,7 +287,7 @@ TestHarness.test('insufficient members', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers.slice(1), msg_hash_bin)
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/num_sigs'")
@@ -183,7 +298,7 @@ TestHarness.test('insufficient members', {
 TestHarness.test('wrong members', {
 }, async (harness, assert) => {
     const expiry = BigNumber.from(Date.now()).add(10000)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -197,7 +312,7 @@ TestHarness.test('wrong members', {
     const [bad_signer, good_signer_1, good_signer_2] = await ethers.getSigners()
     const [v_arr, r_arr, s_arr] = await sign(harness.sort_participants([bad_signer, good_signer_1, good_signer_2]).signers, msg_hash_bin)
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/not_member'")
@@ -207,7 +322,7 @@ TestHarness.test('wrong members', {
 TestHarness.test('repeated signatures', {
 }, async (harness, assert) => {
     const expiry = BigNumber.from(Date.now()).add(10000)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -220,7 +335,7 @@ TestHarness.test('repeated signatures', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.sort_participants([harness.signers[0], harness.signers[1], harness.signers[0]]).signers, msg_hash_bin)
     try {
-        await send(msig.exec, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
@@ -230,7 +345,7 @@ TestHarness.test('repeated signatures', {
 TestHarness.test('member addresses wrong order', {
 }, async (harness, assert) => {
     const expiry = BigNumber.from(Date.now()).add(10000)
-    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId)
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
     const nonce = await msig.nonce()
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
@@ -243,7 +358,7 @@ TestHarness.test('member addresses wrong order', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     try {
-        await send(msig.exec, v_arr.reverse(), r_arr.reverse(), s_arr.reverse(), ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr.reverse(), r_arr.reverse(), s_arr.reverse(), ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
@@ -254,7 +369,7 @@ TestHarness.test('fail create too many members', {
 }, async (harness, assert) => {
     const members = [...Array(17).keys()].map((_) => ethers.Wallet.createRandom());
     try {
-        await harness.msig_factory.deploy(17, harness.sort_participants(members).members, harness.chainId)
+        await harness.msig_factory.deploy(17, harness.sort_participants(members).members, harness.chainId, 0)
         assert.fail()
     } catch (e) {
         // pass
@@ -265,7 +380,7 @@ TestHarness.test('fail create with threshold > members', {
 }, async (harness, assert) => {
     const threshold = 4
     try {
-        await harness.msig_factory.deploy(threshold, harness.members, harness.chainId)
+        await harness.msig_factory.deploy(threshold, harness.members, harness.chainId, 0)
         assert.fail() // ensure failure if doesn't throw
     } catch (e) {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/min_owners'")
@@ -276,7 +391,7 @@ TestHarness.test('fail create member addresses wrong order', {
 }, async (harness, assert) => {
     const threshold = 3
     try {
-        await harness.msig_factory.deploy(threshold, harness.members.reverse(), harness.chainId)
+        await harness.msig_factory.deploy(threshold, harness.members.reverse(), harness.chainId, 0)
         assert.fail() // ensure failure if doesn't throw
     } catch (e) {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
