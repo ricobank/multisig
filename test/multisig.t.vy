@@ -6,7 +6,7 @@ interface Snek:
     def rand(set: uint256) -> uint256: nonpayable
 
 interface Multisig:
-    def load(v: DynArray[uint256, 16], r: DynArray[uint256, 16], s: DynArray[uint256, 16], target: address, amount: uint256, data: Bytes[2000], executor: address): nonpayable
+    def load(v: DynArray[uint256, 16], r: DynArray[uint256, 16], s: DynArray[uint256, 16], target: address, amount: uint256, data: Bytes[2000], executor: address, gate: bool): payable
     def __default__(): payable
     def members(arg0: uint256) -> address: view
     def is_member(arg0: address) -> bool: view
