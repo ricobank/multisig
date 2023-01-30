@@ -7,11 +7,13 @@ const { send, wad, wait } = require('minihat')
 
 const TestHarness = require('./test-harness')
 
-const TXTYPE_HASH           = '0xb7267299ee78157c26d16798607b94eb975a922c460faff36ef284150d471f6d'
+const TXTYPE_HASH           = '0xc22bd03800e8d0fb968a99a54aeb6261577647195ab20a990aaa169b65ddee05'
 const NAME_HASH             = '0xe463279c76a26a807fc93adcd7da8c78758960944d3dd615283d0a9fa20efdc6'
 const VERSION_HASH          = '0xc89efdaa54c0f20c7adf612882df0950f5a951637e0307cdcb4c672f298b8bc6'
 const EIP712DOMAINTYPE_HASH = '0xd87cd6ef79d4e2b95e15ce8abf732db51ec771f1ca2edccf22a46c729ac56472'
 const SALT                  = '0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650'
+const CALL                  = 0
+const DLGT                  = 1
 
 TestHarness.test('msig moves ether', async (harness, assert) => {
     // Setup
@@ -29,14 +31,14 @@ TestHarness.test('msig moves ether', async (harness, assert) => {
     const nonce = await msig.nonce()
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce, expiry)
+    const tx_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce, expiry, CALL)
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash.slice(2)
     let msg_hash = utils.keccak256(input)
     let msg_hash_bin = ethers.utils.arrayify(msg_hash)
 
     // Sign Transaction
     const [v, r, s] = await sign(harness.signers, msg_hash_bin)
-    await send(msig.load, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
+    await send(msig.load, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, CALL, { gasLimit: 10000000 })
     // Check that the ether was not moved
     let new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.sub(prior_balance).eq(wad(0)), true)
@@ -98,8 +100,8 @@ TestHarness.test('add multiple calls to queue', async (harness, assert) => {
     const nonce2 = nonce1.add(1)
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_hash1 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce1, expiry)
-    const tx_hash2 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce2, expiry)
+    const tx_hash1 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce1, expiry, CALL)
+    const tx_hash2 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, nonce2, expiry, CALL)
     let input1 = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash1.slice(2)
     let input2 = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash2.slice(2)
     let msg_hash1 = utils.keccak256(input1)
@@ -110,8 +112,8 @@ TestHarness.test('add multiple calls to queue', async (harness, assert) => {
     // Sign and queue transactions
     const [v, r, s] = await sign(harness.signers, msg_hash_bin1)
     const [v2, r2, s2] = await sign(harness.signers, msg_hash_bin2)
-    await send(msig.load, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
-    await send(msig.load, v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, { gasLimit: 10000000 })
+    await send(msig.load, v, r, s, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, CALL, { gasLimit: 10000000 })
+    await send(msig.load, v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.Zero, expiry, CALL, { gasLimit: 10000000 })
 
     let nonce = await msig.nonce()
     assert.equal(nonce.eq(2), true)
@@ -162,31 +164,65 @@ TestHarness.test('msig can call other msig', {
         to: msig2.address,
         value: wad(1)
     })
+    const msig1_bal0 = await ethers.provider.getBalance(msig1.address)
+    const msig2_bal0 = await ethers.provider.getBalance(msig2.address)
     // Sign Msig2 Transaction
     const nonce2 = await msig2.nonce()
     const DOMAIN_SEPARATOR2 = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig2.address, SALT)
-    const tx_hash2 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce2, expiry)
+    const tx_hash2 = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce2, expiry, CALL)
     let input2 = '0x19' + '01' + DOMAIN_SEPARATOR2.slice(2) + tx_hash2.slice(2)
     let msg_hash2 = utils.keccak256(input2)
     let msg_hash_bin2 = ethers.utils.arrayify(msg_hash2)
     const [v2, r2, s2] = await sign(harness.signers, msg_hash_bin2)
-    const tx2 = msig2.interface.encodeFunctionData("load", [v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry])
+    const tx2 = msig2.interface.encodeFunctionData("load", [v2, r2, s2, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL])
     // Sign Msig1 Transaction
     const nonce1 = await msig1.nonce()
     const DOMAIN_SEPARATOR1 = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig1.address, SALT)
-    const tx_hash1 = createTransactionHash(TXTYPE_HASH, msig2.address, 0, tx2, nonce1, expiry)
+    const tx_hash1 = createTransactionHash(TXTYPE_HASH, msig2.address, 0, tx2, nonce1, expiry, CALL)
     let input1 = '0x19' + '01' + DOMAIN_SEPARATOR1.slice(2) + tx_hash1.slice(2)
     let msg_hash1 = utils.keccak256(input1)
     let msg_hash_bin1 = ethers.utils.arrayify(msg_hash1)
     const [v1, r1, s1] = await sign(harness.signers, msg_hash_bin1)
-    await send(msig1.load, v1, r1, s1, msig2.address, 0, tx2, expiry, { gasLimit: 10000000 })
+    await send(msig1.load, v1, r1, s1, msig2.address, 0, tx2, expiry, CALL, { gasLimit: 10000000 })
     await send(msig1.fire, { gasLimit: 10000000 })
     await send(msig2.fire, { gasLimit: 10000000 })
     // Check that the ether was moved
     const new_balance = await ethers.provider.getBalance(ethers.constants.AddressZero)
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
+    const msig1_bal1 = await ethers.provider.getBalance(msig1.address)
+    const msig2_bal1 = await ethers.provider.getBalance(msig2.address)
+    // assert delegatecall has not been used
+    assert.equal(msig1_bal0.eq(msig1_bal1), true)
+    assert.equal(msig2_bal0.eq(msig2_bal1.add(wad(1))), true)
+})
+
+TestHarness.test('use delegate call', {
+}, async (harness, assert) => {
+    const msig = await harness.msig_factory.deploy(3, harness.members, harness.chainId, 0)
+    const burn = await harness.burn_factory.deploy()
+    const expiry = BigNumber.from(Date.now()).add(10000)
+    const loss = wad(0.1)
+    const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH, harness.chainId, msig.address, SALT)
+    let nonce = await msig.nonce()
+    await harness.signers[0].sendTransaction({to: msig.address, value: wad(1)})
+    await harness.signers[0].sendTransaction({to: burn.address, value: wad(1)})
+    const burn_bal_0 = await ethers.provider.getBalance(burn.address)
+    const msig_bal_0 = await ethers.provider.getBalance(msig.address)
+    const data = burn.interface.encodeFunctionData("burn", [loss])
+    const tx_hash = createTransactionHash(TXTYPE_HASH, burn.address, 0, data, nonce, expiry, DLGT)
+    let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_hash.slice(2)
+    let msg_hash = utils.keccak256(input)
+    let msg_hash_bin = ethers.utils.arrayify(msg_hash)
+    const [v1, r1, s1] = await sign(harness.signers, msg_hash_bin)
+    await send(msig.load, v1, r1, s1, burn.address, 0, data, expiry, DLGT, { gasLimit: 10000000 })
+    await send(msig.fire, { gasLimit: 10000000 })
+    const burn_bal_1 = await ethers.provider.getBalance(burn.address)
+    const msig_bal_1 = await ethers.provider.getBalance(msig.address)
+    // assert delegatecall has been used and msig burned eth, not burn.
+    assert.equal(burn_bal_0.eq(burn_bal_1), true)
+    assert.equal(msig_bal_0.eq(msig_bal_1.add(loss)), true)
 })
 
 TestHarness.test('msig rejects expired tx', {
@@ -198,7 +234,7 @@ TestHarness.test('msig rejects expired tx', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -207,7 +243,7 @@ TestHarness.test('msig rejects expired tx', {
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
     try {
-        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/expired'")
@@ -224,7 +260,7 @@ TestHarness.test('msig accepts valid non-zero expiry', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, harness.members[1], wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, harness.members[1], wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -232,7 +268,7 @@ TestHarness.test('msig accepts valid non-zero expiry', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     await ethers.provider.send("evm_setNextBlockTimestamp", [now])
-    await send(msig.load, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, { value: wad(1), gasLimit: 10000000 })
+    await send(msig.load, v_arr, r_arr, s_arr, harness.members[1], wad(1), ethers.constants.HashZero, expiry, CALL, { value: wad(1), gasLimit: 10000000 })
     await send(msig.fire, { gasLimit: 10000000 })
     const new_balance = await ethers.provider.getBalance(harness.members[1])
     assert.equal(new_balance.sub(prior_balance).eq(wad(1)), true)
@@ -249,7 +285,7 @@ TestHarness.test('re-throw if raw call reverts', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -258,7 +294,7 @@ TestHarness.test('re-throw if raw call reverts', {
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     // raw call should fail but tx should still clear a pending call and increment next
     try {
-        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL, { gasLimit: 10000000 })
         await send(msig.fire, { gasLimit: 10000000 })
     } catch (e) {
         // pass
@@ -279,7 +315,7 @@ TestHarness.test('insufficient members', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -287,7 +323,7 @@ TestHarness.test('insufficient members', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers.slice(1), msg_hash_bin)
     try {
-        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/num_sigs'")
@@ -303,7 +339,7 @@ TestHarness.test('wrong members', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -312,7 +348,7 @@ TestHarness.test('wrong members', {
     const [bad_signer, good_signer_1, good_signer_2] = await ethers.getSigners()
     const [v_arr, r_arr, s_arr] = await sign(harness.sort_participants([bad_signer, good_signer_1, good_signer_2]).signers, msg_hash_bin)
     try {
-        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/not_member'")
@@ -327,7 +363,7 @@ TestHarness.test('repeated signatures', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -335,7 +371,7 @@ TestHarness.test('repeated signatures', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.sort_participants([harness.signers[0], harness.signers[1], harness.signers[0]]).signers, msg_hash_bin)
     try {
-        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr, r_arr, s_arr, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
@@ -350,7 +386,7 @@ TestHarness.test('member addresses wrong order', {
 
     const DOMAIN_SEPARATOR = createDomainSeparator(EIP712DOMAINTYPE_HASH, NAME_HASH, VERSION_HASH,
         harness.chainId, msig.address, SALT)
-    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry)
+    const tx_input_hash = createTransactionHash(TXTYPE_HASH, ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, nonce, expiry, CALL)
 
     let input = '0x19' + '01' + DOMAIN_SEPARATOR.slice(2) + tx_input_hash.slice(2)
     let msg_hash = utils.keccak256(input)
@@ -358,7 +394,7 @@ TestHarness.test('member addresses wrong order', {
 
     const [v_arr, r_arr, s_arr] = await sign(harness.signers, msg_hash_bin)
     try {
-        await send(msig.load, v_arr.reverse(), r_arr.reverse(), s_arr.reverse(), ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, { gasLimit: 10000000 })
+        await send(msig.load, v_arr.reverse(), r_arr.reverse(), s_arr.reverse(), ethers.constants.AddressZero, wad(1), ethers.constants.HashZero, expiry, CALL, { gasLimit: 10000000 })
         assert.fail()
     } catch (e) {
         assert.equal(e, "Error: VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
@@ -409,13 +445,14 @@ function createDomainSeparator(domain_type_hash, name_hash, version_hash, chain_
     return utils.keccak256(domain_data.toLowerCase())
 }
 
-function createTransactionHash(tx_type_hash, target_address, amount, data, nonce, expiry) {
+function createTransactionHash(tx_type_hash, target_address, amount, data, nonce, expiry, gate) {
     let tx_input = tx_type_hash
         + target_address.slice(2).padStart(64, '0')
         + utils.hexlify(amount).slice(2).padStart(64, '0')
         + utils.keccak256(data).slice(2)
         + utils.hexlify(nonce).slice(2).padStart(64, '0')
         + utils.hexlify(expiry).slice(2).padStart(64, '0')
+        + utils.hexlify(gate).slice(2).padStart(64, '0')
     return utils.keccak256(tx_input.toLowerCase())
 }
 

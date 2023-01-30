@@ -5,12 +5,13 @@ struct Bolt:
     data: Bytes[2000]
     size: uint256
     show: uint256
+    gate: bool
 
 ## EIP712 Precomputed hashes:
 EIP712DOMAINTYPE_HASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
 NAME_HASH:             constant(bytes32) = keccak256("tiny multisig")
 VERSION_HASH:          constant(bytes32) = keccak256("1")
-TXTYPE_HASH:           constant(bytes32) = keccak256("MultiSigTransaction(address destination,uint256 value,bytes data,uint256 nonce,uint256 expiry)")
+TXTYPE_HASH:           constant(bytes32) = keccak256("MultiSigTransaction(address destination,uint256 value,bytes data,uint256 nonce,uint256 expiry, bool gate)")
 SALT:                  constant(bytes32) = 0x129d390a401694aef5508ae83353e4124512a4c5bf5b10995b62abe1fb85b650
 MAX_OWNERS:            constant(uint256) = 16
 DOMAIN_SEPARATOR:      immutable(bytes32)
@@ -59,12 +60,12 @@ def __init__( threshold: uint256,
 @external
 @payable
 def load(v: DynArray[uint256, MAX_OWNERS], r: DynArray[uint256, MAX_OWNERS], s: DynArray[uint256, MAX_OWNERS],
-         dest: address, size: uint256, data: Bytes[2000], expiry: uint256):
+         dest: address, size: uint256, data: Bytes[2000], expiry: uint256, gate: bool):
     assert expiry >= block.timestamp, 'err/expired'
     assert len(v) == len(r) \
        and len(r) == len(s) \
        and len(s) == self.threshold, 'err/num_sigs'
-    txn_hash: bytes32 = keccak256(_abi_encode(TXTYPE_HASH, dest, size, keccak256(data), self.nonce, expiry))
+    txn_hash: bytes32 = keccak256(_abi_encode(TXTYPE_HASH, dest, size, keccak256(data), self.nonce, expiry, gate))
     sum_hash: bytes32 = keccak256(concat(convert('\x19\x01', Bytes[2]), DOMAIN_SEPARATOR, txn_hash))
     msg_hash: bytes32 = keccak256(concat(convert("\x19Ethereum Signed Message:\n32", Bytes[32]), sum_hash))
     last:     address = empty(address)
@@ -75,7 +76,7 @@ def load(v: DynArray[uint256, MAX_OWNERS], r: DynArray[uint256, MAX_OWNERS], s: 
         assert convert(addr, uint160) > convert(last, uint160), 'err/owner_order'
         assert self.is_member[addr], 'err/not_member'
         last = addr
-    self.line[self.nonce] = Bolt({dest: dest, data: data, size: size, show: block.timestamp + self.wait})
+    self.line[self.nonce] = Bolt({dest: dest, data: data, size: size, show: block.timestamp + self.wait, gate: gate})
     log Loaded(self.nonce, dest, size, data)
     self.nonce += 1
 
@@ -88,7 +89,10 @@ def fire():
     self.line[self.next] = empty(Bolt)
     log Executed(self.next, bolt.dest, bolt.size, bolt.data)
     self.next += 1
-    raw_call(bolt.dest, bolt.data, max_outsize=0, value=bolt.size, revert_on_failure=False)
+    if bolt.gate:
+        raw_call(bolt.dest, bolt.data, max_outsize=0, value=bolt.size, is_delegate_call=True,  revert_on_failure=False)
+    else:
+        raw_call(bolt.dest, bolt.data, max_outsize=0, value=bolt.size, is_delegate_call=False, revert_on_failure=False)
 
 @external
 @payable
