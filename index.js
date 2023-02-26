@@ -69,7 +69,6 @@ const bare = (out_file, deploy_file) => {
     console.log(`wrote tx template to ${out_file}`)
     
     const deploy_template = {
-        "provider_addr": 'http://127.0.0.1:7545/',
         "threshold": 2,
         "members": ["0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"],
         "chain_id": chain_id,
@@ -83,8 +82,7 @@ const bare = (out_file, deploy_file) => {
 
 const deploy = async (deploy_file) => {
     const conf = require(deploy_file)
-    const prov = new ethers.providers.JsonRpcProvider(conf.provider_addr)
-    const signer = prov.getSigner(0)
+    const signer = await get_frame_signer(conf.chain_id)
     const msig = contracts.contracts['src/Multisig.vy'].Multisig
     const fact = new ethers.ContractFactory(msig.abi, msig.evm.bytecode, signer)
     const inst = await fact.deploy(conf.threshold, conf.members, conf.chain_id, conf.wait)
@@ -146,15 +144,19 @@ const get_encoded_data = (conf) => {
     return iface.encodeFunctionData(func_name, params)
 }
 
-const get_contract = async (in_file) => {
-    const conf = require(in_file)
+const get_frame_signer = async (chain_id) => {
     await frame.request({
         method: 'wallet_switchEthereumChain',
-        params: [{ chainId: conf.chain_id }],
+        params: [{ chainId: chain_id }],
     });
     const provider = new ethers.providers.Web3Provider(frame)
+    return provider.getSigner(0)
+}
+
+const get_contract = async (in_file) => {
+    const conf = require(in_file)
+    const signer = await get_frame_signer(conf.chain_id)
     const abi  = contracts.contracts['src/Multisig.vy'].Multisig.abi
-    const signer = provider.getSigner(0)
     return new ethers.Contract(conf.msig_addr, abi, signer)
 }
 
