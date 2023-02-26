@@ -5,15 +5,17 @@
     "initialize": "npm i",
     "test": "snek test && cd test && node multisig-test.js",
     "test2": "node test/multisig-test.js",
-    "test3": "snek test"
+    "test3": "snek test",
+    "cli": "node index.js bare"
   },
   "dependencies": {
-    "tapzero": "^0.6.1"
+    "commander": "^10.0.0",
+    "eth-provider": "^0.13.6"
   },
   "devDependencies": {
-    "@etherpacks/dpack": "^0.0.29",
-    "@nomiclabs/hardhat-ethers": "^2.1.0",
-    "hardhat": "^2.10.0",
-    "minihat": "^0.0.6"
+    "@nomiclabs/hardhat-ethers": "^2.2.2",
+    "hardhat": "^2.12.7",
+    "minihat": "^0.0.6",
+    "tapzero": "^0.6.1"
   }
 }
