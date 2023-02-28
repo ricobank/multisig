@@ -5,6 +5,7 @@ const ethers = hh.ethers
 const { BigNumber, utils } = require("ethers")
 const { send, wad, wait } = require('minihat')
 
+const { createDomainSeparator, createTransactionHash } = require('../helpers.js');
 const TestHarness = require('./test-harness')
 
 const TXTYPE_HASH           = '0xc22bd03800e8d0fb968a99a54aeb6261577647195ab20a990aaa169b65ddee05'
@@ -433,28 +434,6 @@ TestHarness.test('fail create member addresses wrong order', {
         assert.equal(e.reason, "VM Exception while processing transaction: reverted with reason string 'err/owner_order'")
     }
 })
-
-// Test Helper Functions 
-function createDomainSeparator(domain_type_hash, name_hash, version_hash, chain_id, address, salt) {
-    const domain_data = domain_type_hash
-        + name_hash.slice(2)
-        + version_hash.slice(2)
-        + utils.hexlify(chain_id).slice(2).padStart(64, '0')
-        + address.slice(2).padStart(64, '0')
-        + salt.slice(2)
-    return utils.keccak256(domain_data.toLowerCase())
-}
-
-function createTransactionHash(tx_type_hash, target_address, amount, data, nonce, expiry, gate) {
-    let tx_input = tx_type_hash
-        + target_address.slice(2).padStart(64, '0')
-        + utils.hexlify(amount).slice(2).padStart(64, '0')
-        + utils.keccak256(data).slice(2)
-        + utils.hexlify(nonce).slice(2).padStart(64, '0')
-        + utils.hexlify(expiry).slice(2).padStart(64, '0')
-        + utils.hexlify(gate).slice(2).padStart(64, '0')
-    return utils.keccak256(tx_input.toLowerCase())
-}
 
 sign = async (signers, msg_hash) => {
     const [v, r, s] = [[], [], []]
