@@ -6,16 +6,23 @@
     "test": "snek test && cd test && node multisig-test.js",
     "test2": "node test/multisig-test.js",
     "test3": "snek test",
-    "cli": "node index.js bare"
+    "cli": "node index.js bare",
+    "build": "node build.js"
   },
   "dependencies": {
     "commander": "^10.0.0",
     "eth-provider": "^0.13.6"
   },
   "devDependencies": {
-    "@nomiclabs/hardhat-ethers": "^2.2.2",
+    "@etherpacks/dpack": "^0.0.31",
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-vyper": "^3.0.3",
+    "@types/mocha": "^10.0.1",
     "hardhat": "^2.12.7",
     "minihat": "^0.0.6",
-    "tapzero": "^0.6.1"
+    "tapzero": "^0.6.1",
+    "ts-mocha": "^10.0.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.4"
   }
 }
