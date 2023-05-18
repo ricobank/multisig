@@ -1,0 +1,22 @@
+{
+  "format": "dpack-1",
+  "network": "arbitrum_goerli",
+  "types": {
+    "Multisig": {
+      "typename": "Multisig",
+      "artifact": {
+        "/": "bafkreia5kmw3vtlu6dkekoacu2cq7iy67zzgcstepkzrpfxcxs4yzpowwy"
+      }
+    }
+  },
+  "objects": {
+    "msig": {
+      "objectname": "msig",
+      "address": "0x2238F26a34A28E18fc5ff955e50ebd4aD16fd2e3",
+      "typename": "Multisig",
+      "artifact": {
+        "/": "bafkreia5kmw3vtlu6dkekoacu2cq7iy67zzgcstepkzrpfxcxs4yzpowwy"
+      }
+    }
+  }
+}

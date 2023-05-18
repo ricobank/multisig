@@ -1,0 +1,13 @@
+{
+  "format": "dpack-1",
+  "network": "ethereum",
+  "types": {
+    "Multisig": {
+      "typename": "Multisig",
+      "artifact": {
+        "/": "bafkreifh67c2lr63tb5i3x3i4alx33xmenamtuhkjitt65oeqy6h65jxum"
+      }
+    }
+  },
+  "objects": {}
+}
