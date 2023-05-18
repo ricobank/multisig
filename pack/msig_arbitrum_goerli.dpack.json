@@ -5,17 +5,17 @@
     "Multisig": {
       "typename": "Multisig",
       "artifact": {
-        "/": "bafkreibnbtrlhihek6dzw5r6vwcjvzxro26i3utlxq63i6xkfgmbv7uggy"
+        "/": "bafkreia5kmw3vtlu6dkekoacu2cq7iy67zzgcstepkzrpfxcxs4yzpowwy"
       }
     }
   },
   "objects": {
     "msig": {
       "objectname": "msig",
-      "address": "0xf1FD69BD5Cf639Cf1631b80C184c97D40A2aE444",
+      "address": "0x2238F26a34A28E18fc5ff955e50ebd4aD16fd2e3",
       "typename": "Multisig",
       "artifact": {
-        "/": "bafkreibnbtrlhihek6dzw5r6vwcjvzxro26i3utlxq63i6xkfgmbv7uggy"
+        "/": "bafkreia5kmw3vtlu6dkekoacu2cq7iy67zzgcstepkzrpfxcxs4yzpowwy"
       }
     }
   }
